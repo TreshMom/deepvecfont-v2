@@ -46,23 +46,24 @@ def test_main_model(opts):
             for sample_idx in range(opts.n_samples):
                 ret_dict_test, loss_dict_test = model_main(test_data, mode='test')
 
-                svg_sampled = ret_dict_test['svg']['sampled_1']
-                sampled_svg_2 = ret_dict_test['svg']['sampled_2']
+                svg_sampled = ret_dict_test['svg']['sampled_1'] #
+                sampled_svg_2 = ret_dict_test['svg']['sampled_2'] # pharallel
 
-                img_trg = ret_dict_test['img']['trg']
-                img_output = ret_dict_test['img']['out']
+                img_trg = ret_dict_test['img']['trg'] # png что на входе (исходное)
+                img_output = ret_dict_test['img']['out'] # png на выходе
+                
                 trg_seq_gt = ret_dict_test['svg']['trg']
 
-                img_sample_merge = torch.cat((img_trg.data, img_output.data), -2)
+                img_sample_merge = torch.cat((img_trg.data, img_output.data), -2) # concat по Y  
                 save_file_merge = os.path.join(dir_save, "imgs", f"merge_{opts.img_size}.png")
-                save_image(img_sample_merge, save_file_merge, nrow=8, normalize=True)    
+                save_image(img_sample_merge, save_file_merge, nrow=8, normalize=True) # создает файл из 52 символов из img_sample_merge и ставит img_trg к img_output. 
 
                 for char_idx in range(opts.char_num):
-                    img_gt = (1.0 - img_trg[char_idx,...]).data
+                    img_gt = (1.0 - img_trg[char_idx,...]).data # gt изображение это 1 - тензор исходного
                     save_file_gt = os.path.join(dir_save,"imgs", f"{char_idx:02d}_gt.png")
                     save_image(img_gt, save_file_gt, normalize=True)
 
-                    img_sample = (1.0 - img_output[char_idx,...]).data
+                    img_sample = (1.0 - img_output[char_idx,...]).data # получаем изображение 1 - тензор png на выходе
                     save_file = os.path.join(dir_save,"imgs", f"{char_idx:02d}_{opts.img_size}.png")
                     save_image(img_sample, save_file, normalize=True)
 
@@ -100,7 +101,7 @@ def test_main_model(opts):
                     except:
                         continue
                     syn_svg_f.close()
-                    syn_img_outfile = syn_svg_outfile.replace('.svg', '.png')
+                    syn_img_outfile = syn_svg_outfile.replace('.svg', '.png')  # 104-110 строчка сравнивает iou на прошлой итерации с iou на нынешней и если лучше сохраняет новый (png)
                     svg2img(syn_svg_outfile, syn_img_outfile, img_size=opts.img_size)
                     iou_tmp, l1_tmp = cal_iou(syn_img_outfile, os.path.join(dir_save, "imgs", f"{i:02d}_{opts.img_size}.png"))
                     iou_tmp = iou_tmp
@@ -111,7 +112,7 @@ def test_main_model(opts):
             for i in range(opts.char_num):
                 # print(idx_best_sample[i])
                 syn_svg_outfile_best = os.path.join(os.path.join(dir_save, "svgs_single"), f"syn_{i:02d}_{int(idx_best_sample[i])}_refined.svg")
-                syn_svg_merge_f.write(open(syn_svg_outfile_best, 'r').read())
+                syn_svg_merge_f.write(open(syn_svg_outfile_best, 'r').read()) # пишется svg 
                 if i > 0 and i % 13 == 12:
                     syn_svg_merge_f.write('<br>')
 

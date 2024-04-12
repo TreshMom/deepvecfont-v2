@@ -112,12 +112,13 @@ class ModelMain(nn.Module):
             sampled_svg =  sampled_svg[1:]
             cmd2 = sampled_svg[:,:,0].unsqueeze(-1)
             arg2 = sampled_svg[:,:,1:]
+            
+            
             command_logits_2, args_logits_2 = self.transformer_seqdec.parallel_decoder(cmd_logits=cmd2, args_logits=arg2, memory=latent_feat_seq, trg_char=trg_cls)
             prob_comand = F.softmax(command_logits_2,-1)
             prob_args = F.softmax(args_logits_2,-1)
             update_command = torch.argmax(prob_comand,-1).unsqueeze(-1)
             update_args = torch.argmax(prob_args,-1)
-            
             sampled_svg_parralel = torch.cat((update_command, update_args),-1).transpose(0,1)
 
             commands1 = F.one_hot(sampled_svg[:,:,:1].long(), 4).squeeze().transpose(0, 1)
@@ -145,7 +146,7 @@ class ModelMain(nn.Module):
         input_pts_aux = data['pts_aux']
         arg_quant = numericalize(input_sequence[:, :, :, 4:])
         cmd_cls = torch.argmax(input_sequence[:, :, :, :4], dim=-1).unsqueeze(-1)
-        input_sequence = torch.cat([cmd_cls, arg_quant], dim=-1) # 1 + 8 = 9 dimension
+        input_sequence = torch.cat([cmd_cls, arg_quant], dim=-1) # 1 + 8 = 9 dimension разделили на 4 класса операций и их параметры 
 
         # choose reference classes and target classes
         if mode == 'train':

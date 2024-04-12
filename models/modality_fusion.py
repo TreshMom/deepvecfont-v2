@@ -14,7 +14,7 @@ class ModalityFusion(nn.Module):
     def __init__(self, img_size=64, ref_nshot=4, bottleneck_bits=512, ngf=32, seq_latent_dim=512, mode='train'):
         super().__init__()
         self.mode = mode
-        self.bottleneck_bits = bottleneck_bits
+        self.bottleneck_bits = bottleneck_bits # размерность конечного слоя?
         self.ref_nshot = ref_nshot
         self.mode = mode
         self.fc_merge = nn.Linear(seq_latent_dim * opts.ref_nshot, 512)

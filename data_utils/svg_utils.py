@@ -371,15 +371,15 @@ def _canonicalize(path):
 
 # ######### UTILS FOR CONVERTING TOKENIZED PATHS TO VECTORS ###########
 def _path_to_vector(path, categorical=False):
-    """Converts path's commands to a series of vectors."""
-    # Notes:
-    #   - The SimpleSVG dataset does not have any 't', 'q', 'Z', 'T', or 'Q'.
-    #     Thus, we don't handle those here.
-    #   - We also removed all 'z's.
-    #   - The x-axis-rotation argument to a commands is always 0 in this
-    #     dataset, so we ignore it
+    """Преобразует команды пути в серию векторов."""
+    # Примечания:
+    #   - В наборе данных SimpleSVG нет команд 't', 'q', 'Z', 'T' или 'Q'.
+    #     Поэтому мы не обрабатываем их здесь.
+    #   - Мы также удалили все команды 'z'.
+    #   - Аргумент поворота вокруг оси x в команде всегда равен 0 в этом
+    #     наборе данных, поэтому мы его игнорируем.
 
-    # Many commands have args that correspond to args in other commands.
+    # У многих команд аргументы соответствуют аргументам других команд.
     #   v  __,__ _______________ ______________,_________ __,__ __,__ _,y
     #   h  __,__ _______________ ______________,_________ __,__ __,__ x,_
     #   z  __,__ _______________ ______________,_________ __,__ __,__ _,_
@@ -389,14 +389,14 @@ def _path_to_vector(path, categorical=False):
     #   m  __,__ _______________ ______________,_________ __,__ __,__ x,y
     #   s  __,__ _______________ ______________,_________ __,__ x2,y2 x,y
 
-    # So each command will be converted to a vector where the dimension is the
-    # minimal number of arguments to all commands:
+    # Поэтому каждая команда будет преобразована в вектор, где размерность будет минимальным
+    # количеством аргументов для всех команд:
     #   [rx, ry, large-arc-flag, sweepflag, x1, y1, x2, y2, x, y]
-    # If a command does not output a certain arg, it is set to 0.
-    #   "l 5,5" becomes [0, 0, 0, 0, 0, 0, 0, 0, 5, 5]
+    # Если команда не выводит определенный аргумент, он устанавливается в 0.
+    #   "l 5,5" становится [0, 0, 0, 0, 0, 0, 0, 0, 5, 5]
 
-    # Also note, as of now we also output an extra dimension at index 0, which
-    # indicates which command is being outputted (integer).
+    # Также обратите внимание, что в настоящее время мы также выводим дополнительное измерение
+    # с индексом 0, которое указывает, какая команда выводится (целое число).
     new_path = []
     for cmd in path:
         new_path.append(_cmd_to_vector(cmd, categorical=categorical))
