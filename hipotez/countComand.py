@@ -1,6 +1,6 @@
 import re
 
-with open("resultItalic100.html", "r") as file:
+with open("hipotez/resultItalic100.html", "r") as file:
     html_content = file.read()
 
 # Разбиваем HTML-контент на строки, начинающиеся с тега <svg
@@ -15,45 +15,42 @@ for i in range(1, len(svg_strings)):
     if path_data_match:
         path_data = path_data_match.group(1)
         
-        # Находим все команды "M" в атрибуте "d"
-        m_commands = re.findall(r'M\s*([-+]?\d*\.?\d+)\s+([-+]?\d*\.?\d+)', path_data)
+        # Находим все команды в атрибуте "d"
+        commands = re.findall(r'([MLC])\s*([-+]?\d*\.?\d*)\s+([-+]?\d*\.?\d*)', path_data)
 
-        # Находим все команды "L" в атрибуте "d"
-        l_commands = re.findall(r'L\s*([-+]?\d*\.?\d+)\s+([-+]?\d*\.?\d+)', path_data)
-        
-        # Находим все команды "C" в атрибуте "d"
-        c_commands = re.findall(r'C\s*([-+]?\d*\.?\d+)\s+([-+]?\d*\.?\d+)\s+([-+]?\d*\.?\d+)\s+([-+]?\d*\.?\d+)\s+([-+]?\d*\.?\d+)\s+([-+]?\d*\.?\d+)', path_data)
-        
         # Добавляем информацию о командах в словарь
-        svg_commands[f'SVG {i}'] = {
-            'M': [{'x': float(x), 'y': float(y)} for x, y in m_commands],
-            'L': [{'x': float(x), 'y': float(y)} for x, y in l_commands],
-            'C': [{'x1': float(x1), 'y1': float(y1), 'x2': float(x2), 'y2': float(y2), 'x3': float(x3), 'y3': float(y3)} for x1, y1, x2, y2, x3, y3 in c_commands]
-        }
+        svg_commands[f'SVG {i}'] = [{'command': cmd, 'x': float(x), 'y': float(y)} for cmd, x, y in commands]
+"""
+i = 1
+print(len(svg_commands[f'SVG {i}']))
+a = svg_commands['SVG 1'][1]
+print(a)
+print(a['y'])
+"""
+leng = 0
+sumary = 0
+coc = 0
+for i in range(1, 52):
+    predict = svg_commands[f'SVG {i}']
+    origin = svg_commands[f'SVG {i + 52}']
+    for j in range (0, min(len(predict), len(origin))):
+        if predict[j]['command'] == origin[j]['command']:
+            a = predict[j]['x'] - origin[j]['x'], predict[j]['y'] - origin[j]['y']
+            print(a)
+            sumary += 1
+            if (-1 <= a[0] <= 1) and (-1 <= a[1] <= 1):
+                leng += 1
+                if j == 12:
+                    coc += 1
 
-"""
-# Выводим полученный словарь
-for svg_name, commands_info in svg_commands.items():
-    print(f"{svg_name}:")
-    for command_type, points_list in commands_info.items():
-        print(f"{command_type}:")
-        for point in points_list:
-            print(point)
-        print()
-"""
-"""
-for svg_name, commands_info in svg_commands.items():
-    print(f"{svg_name}:")
-    for command_type, points_list in commands_info.items():
-        print(f"{command_type}: {len(points_list)}")
-    print()
-"""
-# Вывод информации только о первом и пятомдесят втором элементах SVG
-for svg_name, commands_info in svg_commands.items():
-    if svg_name == 'SVG 1' or svg_name == 'SVG 53':
-        print(f"{svg_name}:")
-        for command_type, points_list in commands_info.items():
-            print(f"{command_type}: {len(points_list)}")
-            for point in points_list:
-                print(point)
-        print()
+print(leng)
+print(sumary)
+print(coc)
+
+total_commands = 0
+
+# Проходим по каждому SVG и считаем количество команд
+for svg_id, commands_list in svg_commands.items():
+    total_commands += len(commands_list)
+
+print("Общее количество команд для всех SVG:", total_commands)
