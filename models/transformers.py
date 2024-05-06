@@ -209,7 +209,7 @@ class Transformer_decoder(nn.Module):
         x[:, 0:1, :] = trg_char 
         tgt_mask = tgt_mask.squeeze()
         for layer in self.decoder_layers:
-            x,attn = layer(x, memory, src_mask, tgt_mask) 
+            x, attn = layer(x, memory, src_mask, tgt_mask) 
         out = self.decoder_norm(x)
         N, S, _ = out.shape
         cmd_logits = self.command_fcn(out)
@@ -292,7 +292,7 @@ def _get_key_padding_mask(commands, seq_dim=0):
         seqlen_mask = util_funcs.sequence_mask(lens, opts.max_seq_len)#blue b,opts.max_seq_len
         return seqlen_mask
 
-class Transformer(nn.Module):
+class пTransformer(nn.Module):
     def __init__(
         self,
         *,
@@ -466,6 +466,14 @@ class Transformer(nn.Module):
         Inputs:
         cmd_logits: [b, 51, 4]
         args_logits: [b, 51, 6]
+        '''
+
+        '''
+        cmd_logits : torch.Size([32, 51, 4])
+        args_logits : torch.Size([32, 51, 8, 128])
+        trg_seq : torch.Size([51, 32, 9])
+        trg_seqlen : torch.Size([32])
+        trg_pts_aux : torch.Size([32, 51, 6])
         '''
         cmd_args_mask =  torch.Tensor([[0, 0, 0., 0., 0., 0., 0., 0.],
                                        [1, 1, 0., 0., 0., 0., 1., 1.],

@@ -55,8 +55,10 @@ def train_main_model(opts):
             for key in data: data[key] = data[key].cuda()
             ret_dict, loss_dict = model_main(data)
 
-            loss = opts.loss_w_l1 * loss_dict['img']['l1'] + opts.loss_w_pt_c * loss_dict['img']['vggpt'] + opts.kl_beta * loss_dict['kl'] \
-                    + loss_dict['svg']['total'] + loss_dict['svg_para']['total']
+            loss = opts.loss_w_l1 * loss_dict['img']['l1'] \
+                + opts.loss_w_pt_c * loss_dict['img']['vggpt'] \
+                + opts.kl_beta * loss_dict['kl'] \
+                + loss_dict['svg']['total'] + loss_dict['svg_para']['total']
 
             # perform optimization
             optimizer.zero_grad()

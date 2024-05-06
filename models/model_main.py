@@ -138,19 +138,32 @@ class ModelMain(nn.Module):
         return ret_dict, loss_dict
 
     def fetch_data(self, data, mode):
-
-        input_image = data['rendered'] # [bs, opts.char_num, opts.img_size, opts.img_size]
-        input_sequence = data['sequence'] #  [bs, opts.char_num, opts.max_seq_len]
-        input_seqlen = data['seq_len']
+        """
+        - sequance 52 x 510 -  координаты точек  
+        - sequance_relax 52 x 612: 
+            mod 6 == 1: бинарный показатель EOS
+            mod 6 == 2: бинарный показатель MOVE
+            mod 6 == 3: бинарный показатель LINE 
+            mod 6 == 4: бинарный показатель BIES
+            mod 6 == 5/0: x/y 
+        - class: 52 x 1 c нулями
+        - font_id - название шрифта
+        - pts_aux - 52 x 51 x 6 - координаты точек (?)
+        - rendered_64 - 52 x 64 x 64 c значениями 255
+        - seq_len - 52x1 
+        """
+        input_image = data['rendered'] # [bs, opts.char_num, opts.img_size, opts.img_size] Тензор  bsх52х64х64 каждый слой - 1 буква в png
+        input_sequence = data['sequence'] # [bs, opts.char_num, opts.max_seq_len] bsх52х51
+        input_seqlen = data['seq_len'] 
         input_seqlen = input_seqlen + 1
         input_pts_aux = data['pts_aux']
-        arg_quant = numericalize(input_sequence[:, :, :, 4:])
-        cmd_cls = torch.argmax(input_sequence[:, :, :, :4], dim=-1).unsqueeze(-1)
+        arg_quant = numericalize(input_sequence[:, :, :, 4:]) # по последней оси все элементы начиная с 4
+        cmd_cls = torch.argmax(input_sequence[:, :, :, :4], dim=-1).unsqueeze(-1) # максимальные значения до 4 и получаем также 4 мерный тензор
         input_sequence = torch.cat([cmd_cls, arg_quant], dim=-1) # 1 + 8 = 9 dimension разделили на 4 класса операций и их параметры 
 
         # choose reference classes and target classes
         if mode == 'train':
-            ref_cls = torch.randint(0, self.opts.char_num, (input_image.size(0), self.opts.ref_nshot)).cuda()
+            ref_cls = torch.randint(0, self.opts.char_num, (input_image.size(0), self.opts.ref_nshot)).cuda() # тензор 1х4 с rnd значениями от 0 до 51(могут повтоярется)
         elif mode == 'val':
             ref_cls = torch.arange(0, self.opts.ref_nshot, 1).cuda().unsqueeze(0).expand(input_image.size(0), -1)
         else:
@@ -160,7 +173,7 @@ class ModelMain(nn.Module):
             ref_cls = torch.tensor(ref_ids).cuda().unsqueeze(0).expand(self.opts.char_num, -1)
         
         if mode in {'train', 'val'}:
-            trg_cls = torch.randint(0, self.opts.char_num, (input_image.size(0), 1)).cuda()
+            trg_cls = torch.randint(0, self.opts.char_num, (input_image.size(0), 1)).cuda() # тензор 1х1 с rnd значениями от 0 до 51(могут повтоярется)
         else:
             trg_cls = torch.arange(0, self.opts.char_num).cuda()
             trg_cls = trg_cls.view(self.opts.char_num, 1)
@@ -169,33 +182,33 @@ class ModelMain(nn.Module):
             input_pts_aux = input_pts_aux.expand(self.opts.char_num, -1, -1, -1)
             input_seqlen = input_seqlen.expand(self.opts.char_num, -1, -1)
 
-        ref_img = util_funcs.select_imgs(input_image, ref_cls, self.opts)
+        ref_img = util_funcs.select_imgs(input_image, ref_cls, self.opts) # тензор 1x1x64x64 - выбирает из тензора всех букв слой 1 буквы т е тензор 1 буквы (при каждой итерации разную)
         # select a target glyph image
-        trg_img = util_funcs.select_imgs(input_image, trg_cls, self.opts)
+        trg_img = util_funcs.select_imgs(input_image, trg_cls, self.opts) # тензор 1x1x64x64 - выбирает из тензора всех букв слой 1 буквы т е тензор 1 буквы (при каждой итерации разную)
         # randomly select ref vector glyphs
-        ref_seq = util_funcs.select_seqs(input_sequence, ref_cls, self.opts, self.opts.dim_seq_short) # [opts.batch_size, opts.ref_nshot, opts.max_seq_len, opts.dim_seq_nmr]
+        ref_seq = util_funcs.select_seqs(input_sequence, ref_cls, self.opts, self.opts.dim_seq_short) # [opts.batch_size, opts.ref_nshot, opts.max_seq_len, opts.dim_seq_nmr] получаем тезор последовательной для 1 буквы но я не знаю той же что и ref_img или нет?
         # randomly select a target vector glyph
-        trg_seq = util_funcs.select_seqs(input_sequence, trg_cls, self.opts, self.opts.dim_seq_short)
-        trg_seq = trg_seq.squeeze(1)
-        trg_pts_aux = util_funcs.select_seqs(input_pts_aux, trg_cls, self.opts, opts.n_aux_pts)
+        trg_seq = util_funcs.select_seqs(input_sequence, trg_cls, self.opts, self.opts.dim_seq_short) # [opts.batch_size, opts.ref_nshot, opts.max_seq_len, opts.dim_seq_nmr] получаем тезор последовательной для 1 буквы но я не знаю той же что и trg_img или нет?
+        trg_seq = trg_seq.squeeze(1) # делать trg_seq трехмерным тенхором удаляя размерность 1 отвечающую за bs
+        trg_pts_aux = util_funcs.select_seqs(input_pts_aux, trg_cls, self.opts, opts.n_aux_pts) # тезор вспомогательных точек? 
         trg_pts_aux = trg_pts_aux.squeeze(1)
         # the one-hot target char class
-        trg_char_onehot = util_funcs.trgcls_to_onehot(trg_cls, self.opts)
+        trg_char_onehot = util_funcs.trgcls_to_onehot(trg_cls, self.opts) # возвращает one-hot кодировку 3 мерный тензор для буквы из тензорв trg_cls
         # shift target sequence
-        trg_seq_gt = trg_seq.clone().detach()
+        trg_seq_gt = trg_seq.clone().detach() # копируем trg_seq но не вычисляем градиент  
         trg_seq_gt = torch.cat((trg_seq_gt[:, :, :1], trg_seq_gt[:, :, 3:]), -1)
-        trg_seq = trg_seq.transpose(0, 1)
-        trg_seq_shifted = util_funcs.shift_right(trg_seq)
+        trg_seq = trg_seq.transpose(0, 1) # меняет размерность trg_seq с 4 x 51 x 9 на 51 x 4 x 9
+        trg_seq_shifted = util_funcs.shift_right(trg_seq) # сдвиг матриц в тензоре матрица на 0 индексте станет матрице на 1, последняя - удалится, а новая 0 - будет заполнена 0
 
-        ref_seq_cat = ref_seq.view(ref_seq.size(0) * ref_seq.size(1), ref_seq.size(2), ref_seq.size(3))       
-        ref_seq_cat = ref_seq_cat.transpose(0,1)
-        ref_seqlen = util_funcs.select_seqlens(input_seqlen, ref_cls, self.opts)
+        ref_seq_cat = ref_seq.view(ref_seq.size(0) * ref_seq.size(1), ref_seq.size(2), ref_seq.size(3)) # делаем тензор как ref_seq если bs = 1, иначе слекиваем бати по 0 оси
+        ref_seq_cat = ref_seq_cat.transpose(0,1) # меняе 0 и 1 оси получаем 4 x 51 x 9
+        ref_seqlen = util_funcs.select_seqlens(input_seqlen, ref_cls, self.opts) # тензор с длинными последовательностей для конкретных букв
         ref_seqlen_cat = ref_seqlen.view(ref_seqlen.size(0) * ref_seqlen.size(1), ref_seqlen.size(2))
         ref_pad_mask = torch.zeros(ref_seqlen_cat.size(0), self.opts.max_seq_len) # value = 1 means pos to be masked
         for i in range(ref_seqlen_cat.size(0)):
             ref_pad_mask[i,:ref_seqlen_cat[i]] = 1
         ref_pad_mask = ref_pad_mask.cuda().float().unsqueeze(1)
-        trg_seqlen = util_funcs.select_seqlens(input_seqlen, trg_cls, self.opts)
+        trg_seqlen = util_funcs.select_seqlens(input_seqlen, trg_cls, self.opts) # извеление длинн из trg_seq
         trg_seqlen = trg_seqlen.squeeze()
 
         return [ref_img, trg_img], [ref_seq, ref_seq_cat, ref_pad_mask, trg_seq, trg_seq_gt, trg_seq_shifted, trg_pts_aux], [trg_char_onehot, trg_cls, trg_seqlen]
