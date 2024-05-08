@@ -292,7 +292,7 @@ def _get_key_padding_mask(commands, seq_dim=0):
         seqlen_mask = util_funcs.sequence_mask(lens, opts.max_seq_len)#blue b,opts.max_seq_len
         return seqlen_mask
 
-class пTransformer(nn.Module):
+class Transformer(nn.Module):
     def __init__(
         self,
         *,
