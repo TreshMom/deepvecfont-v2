@@ -1,5 +1,8 @@
 data/
 experiments/
+.svg
+.npy
+.otf
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
