@@ -164,7 +164,7 @@ class ModelMain(nn.Module):
         - rendered_64 - 52 x 64 x 64 c значениями 255
         - seq_len - 52x1 
         """
-        input_image = data['rendered'] # [bs, opts.char_num, opts.img_size, opts.img_size] Тензор  bsх52х64х64 каждый слой - 1 буква в png. Для TT почему-то нули
+        input_image = data['rendered'] # [bs, opts.char_num, opts.img_size, opts.img_size] Тензор  bsх52х64х64 каждый слой - 1 буква в png.
         input_sequence = data['sequence'] # [bs, opts.char_num, opts.max_seq_len] bsх52х51
         input_seqlen = data['seq_len'] 
         input_seqlen = input_seqlen + 1
@@ -173,7 +173,7 @@ class ModelMain(nn.Module):
         cmd_cls = torch.argmax(input_sequence[:, :, :, :4], dim=-1).unsqueeze(-1) # переделывает тензор из бинарных команд в тензор [1, 52, 51, 1] где записаны номер команды (0 до 3) если нет команды - 0, если команда EOS - 0
         input_sequence = torch.cat([cmd_cls, arg_quant], dim=-1) # конкат двух предыдущих тензеров = [1, 52, 51, 9], 9 = 1 - команда + 8 точки
 
-        input_image_italic = data['rendered'] # [bs, opts.char_num, opts.img_size, opts.img_size] Тензор  bsх52х64х64 каждый слой - 1 буква в png. Для TT почему-то нули
+        input_image_italic = data['rendered'] # [bs, opts.char_num, opts.img_size, opts.img_size] Тензор  bsх52х64х64 каждый слой - 1 буква в png. 
         input_sequence_italic = data['sequence'] # [bs, opts.char_num, opts.max_seq_len] bsх52х51
         input_seqlen_italic = data['seq_len'] 
         input_seqlen_italic = input_seqlen + 1
@@ -205,9 +205,9 @@ class ModelMain(nn.Module):
             input_pts_aux = input_pts_aux.expand(self.opts.char_num, -1, -1, -1)
             input_seqlen = input_seqlen.expand(self.opts.char_num, -1, -1)
 
-        ref_img = util_funcs.select_imgs(input_image, ref_cls, self.opts) # [bs/char_num, nshots, 64, 64] - все нулями? -  выбирает из тензора всех букв слой 4 букв 
+        ref_img = util_funcs.select_imgs(input_image, ref_cls, self.opts) # [bs/char_num, nshots, 64, 64]  выбирает из тензора всех букв слой 4 букв 
         # select a target glyph image
-        trg_img = util_funcs.select_imgs(input_image_italic, trg_cls, self.opts) # [bs/char_num, nshots, 64, 64] - все нули ? - выбирает из тензора всех букв слой 1 буквы 
+        trg_img = util_funcs.select_imgs(input_image_italic, trg_cls, self.opts) # [bs/char_num, nshots, 64, 64] выбирает из тензора всех букв слой 1 буквы 
         # randomly select ref vector glyphs
         ref_seq = util_funcs.select_seqs(input_sequence, ref_cls, self.opts, self.opts.dim_seq_short) # [batch_size, ref_nshot, max_seq_len, dim_seq_nmr] получаем тезор последовательной для 4 букв но я не знаю той же что и ref_img или нет? и последовательной каких конкретно?
         # randomly select a target vector glyph
