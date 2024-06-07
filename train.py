@@ -27,17 +27,27 @@ def train_main_model(opts):
     dir_sample = os.path.join(dir_exp, "samples")
     dir_ckpt = os.path.join(dir_exp, "checkpoints")
     dir_log = os.path.join(dir_exp, "logs")
+    dir_save = os.path.join(dir_exp, "SVG")
     logfile_train = open(os.path.join(dir_log, "train_loss_log.txt"), 'w')
     logfile_val = open(os.path.join(dir_log, "val_loss_log.txt"), 'w')
-
+    
     train_loader = get_loader(opts.data_root, opts.img_size, opts.language, opts.char_num, opts.max_seq_len, opts.dim_seq, opts.batch_size, opts.mode)
     val_loader = get_loader(opts.data_root, opts.img_size, opts.language, opts.char_num, opts.max_seq_len, opts.dim_seq, opts.batch_size_val, 'test')
 
     model_main = ModelMain(opts)
 
+    epochs_passed = 0
+    if opts.last_ckpt != "none":
+        # for exmpl: 50_12312.ckpt –– will take 50
+        epochs_passed = int(opts.last_ckpt.split("_")[0])
+        path_ckpt = os.path.join(
+            "experiments", opts.name_exp, "checkpoints", opts.last_ckpt
+        )
+        model_main.load_state_dict(torch.load(path_ckpt)["model"])
+
     if torch.cuda.is_available() and opts.multi_gpu:
         model_main = torch.nn.DataParallel(model_main)
-    
+
     model_main.cuda()
     
     parameters_all = [{"params": model_main.img_encoder.parameters()}, {"params": model_main.img_decoder.parameters()},
@@ -50,7 +60,7 @@ def train_main_model(opts):
     if opts.tboard:
         writer = SummaryWriter(dir_log)
 
-    for epoch in range(opts.init_epoch, opts.n_epochs):
+    for epoch in range(epochs_passed, opts.n_epochs):
         for idx, data in enumerate(train_loader):
             for key in data: data[key] = data[key].cuda()
             ret_dict, loss_dict = model_main(data)
@@ -99,7 +109,45 @@ def train_main_model(opts):
                 
                 img_sample = torch.cat((ret_dict['img']['trg'].data, ret_dict['img']['out'].data), -2)
                 save_file = os.path.join(dir_sample, f"train_epoch_{epoch}_batch_{batches_done}.png")
-                save_image(img_sample, save_file, nrow=8, normalize=True)    
+                save_image(img_sample, save_file, nrow=8, normalize=True)
+
+                
+                svg_sampled = ret_dict['svg']['sampled_1'] #
+                sampled_svg_2 = ret_dict['svg']['sampled_2'] # pharallel
+                    # write results w/o parallel refinement
+                svg_dec_out = svg_sampled.clone().detach()
+                for i, one_seq in enumerate(svg_dec_out):
+                    syn_svg_outfile = os.path.join(os.path.join(dir_save, "svgs_single"), f"syn_{i:02d}_wo_refine.svg")
+
+                    syn_svg_f_ = open(syn_svg_outfile, 'w')
+                    try:
+                        svg = render(one_seq.cpu().numpy())
+                        syn_svg_f_.write(svg)
+                        # syn_svg_merge_f.write(svg)
+                        if i > 0 and i % 13 == 12:
+                            syn_svg_f_.write('<br>')
+                            # syn_svg_merge_f.write('<br>')
+                        
+                    except:
+                        continue
+                    syn_svg_f_.close()
+                
+                # write results w/ parallel refinement
+                svg_dec_out = sampled_svg_2.clone().detach()
+                for i, one_seq in enumerate(svg_dec_out):
+                    syn_svg_outfile = os.path.join(os.path.join(dir_save, "svgs_single"), f"syn_{i:02d}_refined.svg")
+
+                    syn_svg_f = open(syn_svg_outfile, 'w')
+                    try:
+                        svg = render(one_seq.cpu().numpy())
+                        syn_svg_f.write(svg)
+                        #syn_svg_merge_f.write(svg)
+                        
+                        #if i > 0 and i % 13 == 12:
+                        #    syn_svg_merge_f.write('<br>')
+                    except:
+                        continue
+                    syn_svg_f.close()    
                 
             if opts.freq_val > 0 and batches_done % opts.freq_val == 0:
 

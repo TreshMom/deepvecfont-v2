@@ -173,6 +173,14 @@ class ModelMain(nn.Module):
         cmd_cls = torch.argmax(input_sequence[:, :, :, :4], dim=-1).unsqueeze(-1) # переделывает тензор из бинарных команд в тензор [1, 52, 51, 1] где записаны номер команды (0 до 3) если нет команды - 0, если команда EOS - 0
         input_sequence = torch.cat([cmd_cls, arg_quant], dim=-1) # конкат двух предыдущих тензеров = [1, 52, 51, 9], 9 = 1 - команда + 8 точки
 
+        input_image_italic = data['rendered'] # [bs, opts.char_num, opts.img_size, opts.img_size] Тензор  bsх52х64х64 каждый слой - 1 буква в png. Для TT почему-то нули
+        input_sequence_italic = data['sequence'] # [bs, opts.char_num, opts.max_seq_len] bsх52х51
+        input_seqlen_italic = data['seq_len'] 
+        input_seqlen_italic = input_seqlen + 1
+        input_pts_aux_italic = data['pts_aux']
+        arg_quant_italic = numericalize(input_sequence_italic[:, :, :, 4:]) # отрезаются команды, остаются 8 точек и нормализуются в значения от 0 до 127
+        cmd_cls_italic = torch.argmax(input_sequence_italic[:, :, :, :4], dim=-1).unsqueeze(-1) # переделывает тензор из бинарных команд в тензор [1, 52, 51, 1] где записаны номер команды (0 до 3) если нет команды - 0, если команда EOS - 0
+        input_sequence_italic = torch.cat([cmd_cls_italic, arg_quant_italic], dim=-1) # конкат двух предыдущих тензеров = [1, 52, 51, 9], 9 = 1 - команда + 8 точки
         # choose reference classes and target classes
         if mode == 'train':
             ref_cls = torch.randint(0, self.opts.char_num, (input_image.size(0), self.opts.ref_nshot)).cuda()  # input_image.size(0) - bs, тензор [bs, ref_nshot] с rnd значениям от 0 до 51, для каждого bs
@@ -185,7 +193,7 @@ class ModelMain(nn.Module):
             ref_cls = torch.tensor(ref_ids).cuda().unsqueeze(0).expand(self.opts.char_num, -1)
         
         if mode in {'train', 'val'}:
-            trg_cls = torch.randint(0, self.opts.char_num, (input_image.size(0), 1)).cuda() # input_image.size(0) - bs, тензор 1хbs с rnd значениям от 0 до 51, для каждого bs
+            trg_cls = torch.randint(0, self.opts.char_num, (input_image_italic.size(0), 1)).cuda() # input_image.size(0) - bs, тензор 1хbs с rnd значениям от 0 до 51, для каждого bs
         else:
             trg_cls = torch.arange(0, self.opts.char_num).cuda() 
             trg_cls = trg_cls.view(self.opts.char_num, 1)
@@ -199,14 +207,14 @@ class ModelMain(nn.Module):
 
         ref_img = util_funcs.select_imgs(input_image, ref_cls, self.opts) # [bs/char_num, nshots, 64, 64] - все нулями? -  выбирает из тензора всех букв слой 4 букв 
         # select a target glyph image
-        trg_img = util_funcs.select_imgs(input_image, trg_cls, self.opts) # [bs/char_num, nshots, 64, 64] - все нули ? - выбирает из тензора всех букв слой 1 буквы 
+        trg_img = util_funcs.select_imgs(input_image_italic, trg_cls, self.opts) # [bs/char_num, nshots, 64, 64] - все нули ? - выбирает из тензора всех букв слой 1 буквы 
         # randomly select ref vector glyphs
         ref_seq = util_funcs.select_seqs(input_sequence, ref_cls, self.opts, self.opts.dim_seq_short) # [batch_size, ref_nshot, max_seq_len, dim_seq_nmr] получаем тезор последовательной для 4 букв но я не знаю той же что и ref_img или нет? и последовательной каких конкретно?
         # randomly select a target vector glyph
-        trg_seq = util_funcs.select_seqs(input_sequence, trg_cls, self.opts, self.opts.dim_seq_short) # [batch_size, 1, max_seq_len (51), dim_seq_nmr (9)] получаем тезор последовательной для 1 буквы но я не знаю той же что и trg_img или нет?
+        trg_seq = util_funcs.select_seqs(input_sequence_italic, trg_cls, self.opts, self.opts.dim_seq_short) # [batch_size, 1, max_seq_len (51), dim_seq_nmr (9)] получаем тезор последовательной для 1 буквы но я не знаю той же что и trg_img или нет?
         trg_seq = trg_seq.squeeze(1) # [bs, max_seq_len (51), dim_seq_nmr (9)] отвечающую за кол-во букв 
         
-        trg_pts_aux = util_funcs.select_seqs(input_pts_aux, trg_cls, self.opts, opts.n_aux_pts) # [bs, 1, max_seq_len (51), count_pts_aux (9)] тезор вспомогательных точек для trg буквы
+        trg_pts_aux = util_funcs.select_seqs(input_pts_aux_italic, trg_cls, self.opts, opts.n_aux_pts) # [bs, 1, max_seq_len (51), count_pts_aux (9)] тезор вспомогательных точек для trg буквы
         trg_pts_aux = trg_pts_aux.squeeze(1)
 
         # the one-hot target char class
@@ -229,7 +237,7 @@ class ModelMain(nn.Module):
             ref_pad_mask[i,:ref_seqlen_cat[i]] = 1
         ref_pad_mask = ref_pad_mask.cuda().float().unsqueeze(1)
 
-        trg_seqlen = util_funcs.select_seqlens(input_seqlen, trg_cls, self.opts) # тензор с длинными последовательностей для trg
+        trg_seqlen = util_funcs.select_seqlens(input_seqlen_italic, trg_cls, self.opts) # тензор с длинными последовательностей для trg
         trg_seqlen = trg_seqlen.squeeze()
 
         return [ref_img, trg_img], [ref_seq, ref_seq_cat, ref_pad_mask, trg_seq, trg_seq_gt, trg_seq_shifted, trg_pts_aux], [trg_char_onehot, trg_cls, trg_seqlen]

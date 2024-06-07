@@ -49,5 +49,6 @@ def get_parser_main_model():
     parser.add_argument('--loss_w_args', type=float, default=1.0, help='the weight of args loss')
     parser.add_argument('--loss_w_aux', type=float, default=0.01, help='the weight of pts aux loss')
     parser.add_argument('--loss_w_smt', type=float, default=10., help='the weight of smooth loss')
-                            
+
+    parser.add_argument("--last_ckpt", type=str, default="none")                       
     return parser
