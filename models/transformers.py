@@ -209,7 +209,7 @@ class Transformer_decoder(nn.Module):
         x[:, 0:1, :] = trg_char 
         tgt_mask = tgt_mask.squeeze()
         for layer in self.decoder_layers:
-            x,attn = layer(x, memory, src_mask, tgt_mask) 
+            x, attn = layer(x, memory, src_mask, tgt_mask) 
         out = self.decoder_norm(x)
         N, S, _ = out.shape
         cmd_logits = self.command_fcn(out)
@@ -464,16 +464,20 @@ class Transformer(nn.Module):
     def loss(self, cmd_logits, args_logits, trg_seq, trg_seqlen, trg_pts_aux):
         '''
         Inputs:
-        cmd_logits: [b, 51, 4]
-        args_logits: [b, 51, 6]
+        cmd_logits : torch.Size([32, 51, 4])
+        args_logits: [bs, 51, 8, 128]
+
+        trg_seq : torch.Size([51, bs, 9])
+        trg_seqlen : torch.Size([bs])
+        trg_pts_aux : torch.Size([bs, 51, 6])
         '''
         cmd_args_mask =  torch.Tensor([[0, 0, 0., 0., 0., 0., 0., 0.],
                                        [1, 1, 0., 0., 0., 0., 1., 1.],
                                        [1, 1, 0., 0., 0., 0., 1., 1.],
                                        [1, 1, 1., 1., 1., 1., 1., 1.]]).to(cmd_logits.device)  
         
-        tgt_commands = trg_seq[:,:,:1].transpose(0,1)
-        tgt_args = trg_seq[:,:,1:].transpose(0,1)
+        tgt_commands = trg_seq[:,:,:1].transpose(0,1) #[bs, 51, 1]
+        tgt_args = trg_seq[:,:,1:].transpose(0,1) #[bs, 51, 8]
         
         seqlen_mask = util_funcs.sequence_mask(trg_seqlen, opts.max_seq_len).unsqueeze(-1)
         seqlen_mask2 = seqlen_mask.repeat(1,1,4)# NOTE b,501,4
@@ -481,16 +485,19 @@ class Transformer(nn.Module):
         seqlen_mask3 = seqlen_mask.unsqueeze(-1).repeat(1,1,8,128)
         
         
-        tgt_commands_onehot = F.one_hot(tgt_commands, 4)
-        tgt_args_onehot = F.one_hot(tgt_args, 128)
+        tgt_commands_onehot = F.one_hot(tgt_commands, 4) # [bs, 51, 1, 4]
+        tgt_args_onehot = F.one_hot(tgt_args, 128) # [bs, 51, 8, 128]
        
-        args_mask = torch.matmul(tgt_commands_onehot.float(),cmd_args_mask).squeeze()
+        args_mask = torch.matmul(tgt_commands_onehot.float(), cmd_args_mask).squeeze() #[bs, 51, 8] на каждую операцию соотвесвенная строчка 
 
-
-        loss_cmd = torch.sum(- tgt_commands_onehot.squeeze() * F.log_softmax(cmd_logits, -1), -1)
-        loss_cmd = torch.mul(loss_cmd, seqlen_mask.squeeze())
-        loss_cmd = torch.mean(torch.sum(loss_cmd/trg_seqlen.unsqueeze(-1),-1))
-        
+        labels_true = tgt_commands.view(-1)
+        predictions = cmd_logits.transpose(1, 2)
+        loss_cmd = nn.CrossEntropyLoss()(predictions, labels_true)
+        '''
+        loss_cmd = torch.sum(- tgt_commands_onehot.squeeze() * F.log_softmax(cmd_logits, -1), -1) #[bs, 51] + log_softmax для каждой команды tgt, неправильная - 1,7437, правильная - 0,7437, EOS - 1,3863
+        loss_cmd = torch.mul(loss_cmd, seqlen_mask.squeeze()) # [bs, 51], где для trg_len есть вероятность, для оставшихся - 0
+        loss_cmd = torch.mean(torch.sum(loss_cmd/trg_seqlen.unsqueeze(-1),-1)) # 
+        '''
         loss_args = (torch.sum(-tgt_args_onehot*F.log_softmax(args_logits,-1),-1)*seqlen_mask4*args_mask)
      
         loss_args = torch.mean(loss_args,dim=-1,keepdim=False)

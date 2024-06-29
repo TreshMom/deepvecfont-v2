@@ -27,9 +27,8 @@ class SVGDataset(data.Dataset):
                     self.font_paths.append(os.path.join(self.dir_path, dir_name))
         self.font_paths.sort()
         print(f"Finished loading {mode} paths, number: {str(len(self.font_paths))}")
-        
+
     def __getitem__(self, index):
-        item = {}
         font_path = self.font_paths[index]
         item = {}
         item['class'] = torch.LongTensor(np.load(os.path.join(font_path, 'class.npy')))
@@ -39,6 +38,14 @@ class SVGDataset(data.Dataset):
         item['rendered'] = torch.FloatTensor(np.load(os.path.join(font_path, 'rendered_' + str(self.img_size) + '.npy'))).view(self.char_num, self.img_size, self.img_size) / 255.
         item['rendered'] = self.trans(item['rendered'])
         item['font_id'] = torch.FloatTensor(np.load(os.path.join(font_path, 'font_id.npy')).astype(np.float32))
+        
+        item['class_italic'] = torch.LongTensor(np.load(os.path.join(font_path, 'class_italic.npy')))
+        item['seq_len_italic'] = torch.LongTensor(np.load(os.path.join(font_path, 'seq_len_italic.npy')))
+        item['sequence_italic'] = torch.FloatTensor(np.load(os.path.join(font_path, 'sequence_relaxed_italic.npy'))).view(self.char_num, self.max_seq_len, self.dim_seq)
+        item['pts_aux_italic'] = torch.FloatTensor(np.load(os.path.join(font_path, 'pts_aux_italic.npy')))
+        item['rendered_italic'] = torch.FloatTensor(np.load(os.path.join(font_path, 'rendered_' + str(self.img_size) + '_italic' + '.npy'))).view(self.char_num, self.img_size, self.img_size) / 255.
+        item['rendered_italic'] = self.trans(item['rendered_italic'])
+        item['font_id_italic'] = torch.FloatTensor(np.load(os.path.join(font_path, 'font_id_italic.npy')).astype(np.float32))
         return item
 
     def __len__(self):
